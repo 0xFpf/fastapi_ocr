@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI OCR</title>
+    <script src="https://unpkg.com/htmx.org@1.6.1"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body>
+    <h1 class="text-xl font-bold flex justify-center my-4">Welcome to an Image to Text online OCR</h1>
+    
+    <div class="mx-4 text-center">
+        <h3 class="font-bold">Test by clicking hi</h3>
+        <div class="mx-4 flex justify-center">
+            <button id="helloButton" class="relative inline-block px-4 py-2 my-2 font-medium group">
+                <span class="absolute inset-0 w-full h-full transition duration-200 ease-out transform translate-x-1 translate-y-1 bg-black group-hover:-translate-x-0 group-hover:-translate-y-0"></span>
+                <span class="absolute inset-0 w-full h-full bg-white border-2 border-black group-hover:bg-black"></span>
+                <span class="relative text-black group-hover:text-white">Say hi</span>
+            </button>
+        </div>
+        <div id="resultContainer"></div>
+        <br>
+    </div>
+    <div class="mx-4 text-center">
+        <h3 class="font-bold">Upload images as a zip folder here</h3>
+        <div class="mx-4 flex justify-center">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <label for="file">Choose a file:</label>
+                <input type="file" name="file" id="file" accept=".zip">
+                <div class="mx-4 flex justify-center">
+                    <button type="button" onclick="uploadFile()" class="relative px-4 py-2 my-2 font-medium group flex justify-center">
+                        <span class="absolute inset-0 w-full h-full transition duration-200 ease-out transform translate-x-1 translate-y-1 bg-black group-hover:-translate-x-0 group-hover:-translate-y-0"></span>
+                        <span class="absolute inset-0 w-full h-full bg-white border-2 border-black group-hover:bg-black"></span>
+                        <span class="relative text-black group-hover:text-white">Upload File</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div id="responseContainer" class="mx-4 text-center"></div>
+        <br>
+
+        <h3 class="font-bold">Convert Images to Text</h3>
+        <div class="mx-4 flex justify-center">
+            <button id="convertButton" class="relative px-4 py-2 my-2 font-medium group flex justify-center">
+                <span class="absolute inset-0 w-full h-full transition duration-200 ease-out transform translate-x-1 translate-y-1 bg-black group-hover:-translate-x-0 group-hover:-translate-y-0"></span>
+                <span class="absolute inset-0 w-full h-full bg-white border-2 border-black group-hover:bg-black"></span>
+                <span class="relative text-black group-hover:text-white">Process Images</span>
+            </button>
+        </div>
+        <div id="resultContainer2" class="mx-4 text-center"></div>
+        <br>
+    </div>
+
+    <div class="mx-4"> 
+        <p class="text-xl font-bold mb-4 text-center">Results Table</p>
+            <table class="mx-auto min-w-[50%] mb-4">
+                <thead class="border-b text-lg">
+                    <th class="border">File Name</th>
+                    <th class="border">Contents</th>
+                </thead>
+                <tbody class="text-left text-sm" id="table-body">
+                    {% include 'table.html'%}
+                </tbody>
+            </table>
+
+            <div class="flex justify-center">
+                <button class="relative inline-block px-4 py-2 font-medium group"
+                    hx-get="/index"
+                    hx-target="#table-body"
+                    hx-swap="beforestart">
+                    <span class="absolute inset-0 w-full h-full transition duration-200 ease-out transform translate-x-1 translate-y-1 bg-black group-hover:-translate-x-0 group-hover:-translate-y-0"></span>
+                    <span class="absolute inset-0 w-full h-full bg-white border-2 border-black group-hover:bg-black"></span>
+                    <span class="relative text-black group-hover:text-white">Load</span>
+                </button>
+                <button class="relative inline-block mx-2 px-4 py-2 font-medium group" onclick="downloadCsv()">
+                    <span class="absolute inset-0 w-full h-full transition duration-200 ease-out transform translate-x-1 translate-y-1 bg-black group-hover:-translate-x-0 group-hover:-translate-y-0"></span>
+                    <span class="absolute inset-0 w-full h-full bg-white border-2 border-black group-hover:bg-black"></span>
+                    <span class="relative text-black group-hover:text-white">Download CSV</span>
+                </button>
+            </div>
+    </div>
+
+    <script>
+        document.getElementById("helloButton").addEventListener("click", async () => {
+            document.getElementById('resultContainer').innerHTML = '';
+            const response = await fetch("/hello");
+            const data = await response.json();
+            document.getElementById("resultContainer").innerText = data.message;
+        });
+        document.getElementById("convertButton").addEventListener("click", async () => {
+            document.getElementById('resultContainer2').innerHTML = '';
+            const response = await fetch("/processimages"); 
+            const data = await response.json();
+            document.getElementById("resultContainer2").innerText = data.message;
+        });        
+    </script>
+
+    <script>
+        function uploadFile() {
+            // Clear the content of responseContainer
+            document.getElementById('responseContainer').innerHTML = '';
+            
+            var form = document.getElementById('uploadForm');
+            var formData = new FormData(form);
+
+            fetch('/uploadfolder', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Display the response in the responseContainer div
+                document.getElementById('responseContainer').innerHTML = data.message;
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+        }
+    </script>
+    
+    <script>
+        async function downloadCsv() {
+            const response = await fetch('/download-csv');
+            const blob = await response.blob();
+
+            // Create a link element and trigger the download
+            const a = document.createElement('a');
+            const url = window.URL.createObjectURL(blob);
+            a.href = url;
+            a.download = 'saved_data.csv';
+            document.body.appendChild(a);
+            a.click();
+
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+    </script>
+
+</body>
+</html>

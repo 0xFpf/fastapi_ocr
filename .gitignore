@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+easyocr/
+images_dir/
+output.json
+saved_data.csv
