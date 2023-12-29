@@ -12,7 +12,7 @@ import json
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# Define path for images folder and create the folder if it doesn't exist
+# Define path for images folder and create if it doesn't exist
 images_dir = Path("images_dir")
 images_dir.mkdir(exist_ok=True)
 data = None
@@ -29,16 +29,16 @@ async def hello():
 @app.post("/uploadfolder")
 async def upload_folder(file: UploadFile = File(...)):
     try:
-        # Save the uploaded zip file to the temporary directory
+        # Save the uploaded zip file to a temporary directory
         zip_path = images_dir / file.filename
         with open(zip_path, "wb") as zip_file:
             shutil.copyfileobj(file.file, zip_file)
 
-        # Extract the contents of the zip file
+        # Extract zip contents
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(images_dir)
         
-        # Process the extracted files (replace this with your own logic)
+        # Process extracted files
         extracted_files = []
         for extracted_folder in images_dir.iterdir():
             if extracted_folder.is_dir():
@@ -48,7 +48,7 @@ async def upload_folder(file: UploadFile = File(...)):
         zip_path.unlink()
         print("Extracted files:", extracted_files)
 
-        # Check if file is an image (JPEG or PNG)
+        # Filter out non-image files
         allowed_image_formats = ["jpeg", "jpg", "png"]
         for file in extracted_files:
             if file.suffix[1:].lower() in allowed_image_formats:
@@ -77,12 +77,12 @@ async def process_images(background_tasks: BackgroundTasks):
 
 @app.get('/index', response_class=HTMLResponse)
 async def index(request: Request, hx_request: Optional[str] = Header(None)):
-    
-    filename=Path('output.json')
-    if filename.exists():
-        with open(filename, 'r') as file:
+    # check that json exists and load it
+    file_path=Path('output.json')
+    if file_path.exists():
+        with open(file_path, 'r') as file:
             textitems = json.load(file)
-
+    # creates context dict, loads request and json data, passes 'context' to table.html
     context={'request':request, 'textitems':textitems}
     if hx_request:
         return templates.TemplateResponse("table.html", context)
@@ -90,8 +90,11 @@ async def index(request: Request, hx_request: Optional[str] = Header(None)):
 
 @app.get("/download-csv")
 async def download_csv(request: Request):
-    file_path = Path("saved_data.csv")  # Replace with the actual path to your saved CSV file
-    return FileResponse(file_path, media_type="text/csv", filename="saved_data.csv")
+    # check that csv exists and return it
+    file_path = Path("saved_data.csv")
+    if file_path.exists():
+        return FileResponse(file_path, media_type="text/csv", filename="saved_data.csv")
+    return {"message": "Failed to retrieve CSV, make sure you have processed the images to completion."}
 
 if __name__ == "__main__":
     import uvicorn
