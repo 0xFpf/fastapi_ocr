@@ -15,8 +15,7 @@ templates = Jinja2Templates(directory="templates")
 # Define path for images folder and create if it doesn't exist
 images_dir = Path("images_dir")
 images_dir.mkdir(exist_ok=True)
-data = None
-result=None
+data=None
 
 @app.get("/")
 def read_root(request: Request):
@@ -29,7 +28,15 @@ async def hello():
 @app.post("/uploadfolder")
 async def upload_folder(file: UploadFile = File(...)):
     try:
-        # Save the uploaded zip file to a temporary directory
+        # Resets subdirectory
+        if images_dir.exists():
+            for item in images_dir.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                elif item.is_file():
+                    item.unlink()
+
+        # Temporarily save the uploaded zip file to images_dir(ectory)
         zip_path = images_dir / file.filename
         with open(zip_path, "wb") as zip_file:
             shutil.copyfileobj(file.file, zip_file)
@@ -68,12 +75,12 @@ async def read_image_task(directory: Path):
 
 @app.get("/processimages")
 async def process_images(background_tasks: BackgroundTasks):
-    directory=Path('images_dir')
-    if directory.exists():
-        background_tasks.add_task(read_image_task, directory)
-        return {"message": "Operation started"}
+    subdirectories=list(images_dir.iterdir())
+    if len(subdirectories)>0:
+        background_tasks.add_task(read_image_task, images_dir)
+        return {"message": "Operation started, processing images, this may take a while."}
     else:
-        raise HTTPException(status_code=404, detail="Folder not found")
+        return {"message": "Err 404, Images not found."} 
 
 @app.get('/index', response_class=HTMLResponse)
 async def index(request: Request, hx_request: Optional[str] = Header(None)):
