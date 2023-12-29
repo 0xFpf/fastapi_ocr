@@ -124,19 +124,26 @@
     <script>
         async function downloadCsv() {
             const response = await fetch('/download-csv');
-            const blob = await response.blob();
+            
+            if (response.ok){
+                const blob = await response.blob();
 
-            // Create a link element and trigger the download
-            const a = document.createElement('a');
-            const url = window.URL.createObjectURL(blob);
-            a.href = url;
-            a.download = 'saved_data.csv';
-            document.body.appendChild(a);
-            a.click();
+                // Create a link element and trigger the download
+                const a = document.createElement('a');
+                const url = window.URL.createObjectURL(blob);
+                a.href = url;
+                a.download = 'saved_data.csv';
+                document.body.appendChild(a);
+                a.click();
 
-            // Cleanup
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+            else {
+                const errorMessage = await response.text();
+                alert(`Error: ${response.status} - ${errorMessage}`);
+            }
         }
     </script>
 
