@@ -89,19 +89,21 @@ async def index(request: Request, hx_request: Optional[str] = Header(None)):
     if file_path.exists():
         with open(file_path, 'r') as file:
             textitems = json.load(file)
-    # creates context dict, loads request and json data, passes 'context' to table.html
-    context={'request':request, 'textitems':textitems}
-    if hx_request:
-        return templates.TemplateResponse("table.html", context)
-    return templates.TemplateResponse("index.html", context)
+        # creates context dict, loads request and json data, passes 'context' to table.html
+        context={'request':request, 'textitems':textitems}
+        if hx_request:
+            return templates.TemplateResponse("table.html", context)
+    raise HTTPException(status_code=404, detail="Images text output not found, process some images and try again.")
 
 @app.get("/download-csv")
 async def download_csv(request: Request):
     # check that csv exists and return it
     file_path = Path("saved_data.csv")
     if file_path.exists():
-        return FileResponse(file_path, media_type="text/csv", filename="saved_data.csv")
-    return {"message": "Failed to retrieve CSV, make sure you have processed the images to completion."}
+        response = FileResponse(file_path, media_type="text/csv", filename="saved_data.csv")
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    raise HTTPException(status_code=404, detail="CSV file not found")
 
 if __name__ == "__main__":
     import uvicorn
