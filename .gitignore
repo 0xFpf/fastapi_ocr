@@ -5,3 +5,4 @@ easyocr/
 images_dir/
 output.json
 saved_data.csv
+db.sqlite3

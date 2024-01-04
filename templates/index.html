@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/htmx.org@1.6.1"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* button animation */
+        /* button styling & animation */
         .button1 {
             position: absolute;
             inset: 0;
@@ -133,7 +133,6 @@
 
     <script>
         function uploadFile() {
-            // Clear the content of responseContainer
             document.getElementById('responseContainer').innerHTML = '';
             
             var form = document.getElementById('uploadForm');
@@ -145,7 +144,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                // Display the response in the responseContainer div
                 document.getElementById('responseContainer').innerHTML = data.message;
             })
             .catch(error => {

@@ -2,12 +2,15 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, R
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
-import bw
+import edit
 import ocr
 import shutil
 from pathlib import Path
 import zipfile
 import json
+
+from sqlmodel import Session, select
+from database import imageModel, engine
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -45,7 +48,7 @@ async def upload_folder(file: UploadFile = File(...)):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(images_dir)
         
-        # Process extracted files
+        # Generate list of paths
         extracted_files = []
         for extracted_folder in images_dir.iterdir():
             if extracted_folder.is_dir():
@@ -57,13 +60,34 @@ async def upload_folder(file: UploadFile = File(...)):
 
         # Filter out non-image files
         allowed_image_formats = ["jpeg", "jpg", "png"]
+        
+        image_list=[]
         for file in extracted_files:
             if file.suffix[1:].lower() in allowed_image_formats:
-                image = bw.convert_img(file)
-                image.save(file, format="JPEG")
+                # Converts image to bw and into bytes
+                image = edit.convert_img(file)
+                image = edit.convert_bytes(image)
+                image_list.append([image, str(file)])
             else:
                 print(f"Invalid file format. file name: {file.name}. File has been removed")
                 file.unlink()
+        # generate dictionary to add to db
+        byteimage_list=[]
+        for id, item in enumerate(image_list, start=1):
+            byteimage_item = {'id': id, 'image_object': item[0], 'name': item[1]}
+            byteimage_list.append(byteimage_item)
+
+        # Add dictionary to db
+        session= Session(engine)
+        statement= select(imageModel)
+        result = session.exec(statement).first()
+        if result is None:
+            for imgmodel in byteimage_list:
+                session.add(imageModel(**imgmodel))
+            session.commit()
+        session.close()
+
+
         return {"message": f"Folder uploaded, {len(extracted_files)} files extracted."}
 
     except Exception as e:

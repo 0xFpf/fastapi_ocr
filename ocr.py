@@ -3,6 +3,9 @@ from pathlib import Path
 import json
 import csv
 
+from sqlmodel import Session, select
+from database import imageModel, engine
+
 current_path = Path.cwd()
 ocr_model= easyocr.Reader(['en'], gpu=True, model_storage_directory=current_path / 'easyocr' ,download_enabled=False)
 extracted_files=[]
@@ -50,9 +53,33 @@ async def read_image(directory : Path):
     with open(json_file_path, 'w', encoding='utf-8') as json_file:
         json.dump(transformed_data, json_file, ensure_ascii=False, indent=2)
 
+    session= Session(engine)
+    statement= select(imageModel)
+    results = session.exec(statement).all()
+    if results:
+        for img_model_data in transformed_data:
+            # Find the matching record in the database based on the name
+            matching_records = []
+            for result in results:
+                if result.name == img_model_data["name"]:
+                    matching_records.append(result)
+            print('matching rec:')
+            print(matching_records)
+            # Get the first matching record, or None if no matches
+            existing_data = next(iter(matching_records), None)
+            print(existing_data)
+            if existing_data:
+                # Update the text field in db
+                existing_data.text = img_model_data["text"]
+
+        session.commit()
+        session.close()
+    else:
+        return "database empty"
+    
     csv_file_path = "saved_data.csv"
     with open(csv_file_path, "w", newline="", encoding='utf-8') as csv_file:
-        csv_writer = csv.DictWriter(csv_file, fieldnames=['name', 'text'])
+        csv_writer = csv.DictWriter(csv_file, fieldnames=['id', 'name', 'text'])
         csv_writer.writeheader()
         csv_writer.writerows(transformed_data)
 
