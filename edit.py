@@ -2,11 +2,16 @@ from PIL import Image
 from io import BytesIO
 
 # Convert the image to a bytes object and return it as binary data
-def convert_bytes(input_image):
+def convert_to_bytes(input_image):
     image_io = BytesIO()
     input_image.save(image_io, format="JPEG")
     image_binary_data = image_io.getvalue()
     return image_binary_data
+
+def convert_to_image(binary_image):
+    image_io = BytesIO(binary_image)
+    image = Image.open(image_io)
+    return image
 
 # Convert the image to grayscale
 def convert_img(input_image):

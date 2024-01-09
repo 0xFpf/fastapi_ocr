@@ -80,11 +80,14 @@
             <button id="convertButton" class="relative px-4 py-2 my-2 font-medium group flex justify-center">
                 <span class="button1"></span>
                 <span class="button2"></span>
-                <span class="button3">Process Images</span>
+                <span class="button3">
+                    <svg id="convertButton_animation" class="animate-spin h-5 w-5 mr-3  inline-block hidden" viewBox="0 0 24 24">
+                        <circle class="opacity-10" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-100" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>Process Images</span>
             </button>
         </div>
-        <div id="resultContainer2" class="mx-4 text-center"></div>
-        <br>
+        <div id="resultContainer2" class="mx-4 my-4 text-center"></div>
     </div>
 
     <div class="mx-4"> 
@@ -101,7 +104,7 @@
 
             <div class="flex justify-center">
                 <button class="relative inline-block px-4 py-2 font-medium group"
-                    hx-get="/index"
+                    hx-get="/loadtable"
                     hx-target="#table-body"
                     hx-swap="beforestart">
                     <span class="button1"></span>
@@ -123,12 +126,37 @@
             const data = await response.json();
             document.getElementById("resultContainer").innerText = data.message;
         });
-        document.getElementById("convertButton").addEventListener("click", async () => {
-            document.getElementById('resultContainer2').innerHTML = '';
-            const response = await fetch("/processimages"); 
-            const data = await response.json();
-            document.getElementById("resultContainer2").innerText = data.message;
-        });        
+    </script>
+    
+    <script>
+        let eventSource;
+        document.getElementById('convertButton').addEventListener('click', () => {
+            if (!eventSource) {
+                convertButton_animation.classList.remove('hidden');
+
+                eventSource = new EventSource('http://localhost:8000/sse/processimages');
+                document.getElementById('resultContainer2').innerHTML = '';
+                const outputDiv = document.getElementById('resultContainer2');
+
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.event === "close") {
+                        console.log("Received close event. Closing connection.");
+                        convertButton_animation.classList.add('hidden');
+                        eventSource.close();
+                    } else {
+                        console.log(data.message)
+                        outputDiv.innerText = data.message;
+                    };
+                }
+
+                eventSource.onerror = (error) => {
+                    console.error('EventSource failed:', error);
+                    eventSource.close();
+                };
+
+            }
+        });
     </script>
 
     <script>
