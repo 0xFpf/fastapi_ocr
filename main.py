@@ -10,7 +10,7 @@ import zipfile
 import csv
 from io import StringIO
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, delete
 from database import imageModel, engine
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,6 +31,14 @@ images_dir = Path("images_dir")
 images_dir.mkdir(exist_ok=True)
 data=None
 
+def reset_dir():
+    if images_dir.exists():
+        for item in images_dir.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            elif item.is_file():
+                item.unlink()
+
 @app.get("/")
 def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "data": data})
@@ -47,13 +55,7 @@ async def hello():
 async def upload_folder(file: UploadFile = File(...), session: Session = Depends(get_session)):
     try:
         # Resets subdirectory
-        if images_dir.exists():
-            for item in images_dir.iterdir():
-                if item.is_dir():
-                    shutil.rmtree(item)
-                elif item.is_file():
-                    item.unlink()
-
+        reset_dir()
         # Temporarily save the uploaded zip file to images_dir(ectory)
         zip_path = images_dir / file.filename
         with open(zip_path, "wb") as zip_file:
@@ -71,7 +73,6 @@ async def upload_folder(file: UploadFile = File(...), session: Session = Depends
                     if extracted_file.is_file():
                         extracted_files.append(extracted_file)
         zip_path.unlink()
-        print("Extracted files:", extracted_files)
 
         # Filter out non-image files
         # In future I may only take in jpeg or convert any png to jpeg before saving the image
@@ -93,23 +94,33 @@ async def upload_folder(file: UploadFile = File(...), session: Session = Depends
             byteimage_item = {'id': id, 'image_object': item[0], 'name': item[1]}
             byteimage_list.append(byteimage_item)
 
-        # Add dictionary to db
+        # If db empty then add dictionary to db
         statement= select(imageModel)
         result = session.exec(statement).first()
         if result is None:
             for imgmodel in byteimage_list:
                 session.add(imageModel(**imgmodel))
             session.commit()
+            reset_dir()
 
-            for item in images_dir.iterdir():
-                if item.is_dir():
-                    shutil.rmtree(item)
-                elif item.is_file():
-                    item.unlink()
-        # Need to add an elif for when first row=1st image path, in which case we skip
-        # Need to add an else for when there is already data but we just want a new database, so this will clear the db
-        else:
+        # If db is equal to images extracted then ignore and skip
+        elif result.name==byteimage_list[0]['name']:
+            print('result==byteimage_list')
+            reset_dir()
             return {"message": "Database full, skipping operation."}
+        
+        # If db exists but images are new then clear the db and add new images
+        else:
+            delete_statement = delete(imageModel)
+            session.exec(delete_statement)
+            session.commit()
+            # deleted_rows = session.exec(delete_statement).rowcount
+            # session.commit()
+            # print(f"Deleted {deleted_rows} rows from the imageModel table.")
+            for imgmodel in byteimage_list:
+                session.add(imageModel(**imgmodel))
+            session.commit()
+            reset_dir()
         
 
         return {"message": f"Folder uploaded, {len(extracted_files)} files extracted."}
