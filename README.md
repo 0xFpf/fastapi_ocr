@@ -2,7 +2,7 @@
 
 This is an implementation of some elements from my OCR & NLP Search Engine project.
 
-Its goal is to be able to extract text from images in bulk. Aiming to have this in production in late January.
+Its goal is to be able to extract text from images in bulk.
 
 Here's a Demo as of 27/12/23:
 
