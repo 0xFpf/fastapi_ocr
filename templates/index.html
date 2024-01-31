@@ -44,7 +44,30 @@
 
 <body>
     <h1 class="text-xl font-bold flex justify-center my-4">Welcome to an Image to Text online OCR</h1>
-    
+    <div class="mx-4 my-4 text-center">
+        <h3 class="font-bold">Login form</h3>
+            <div class="mx-4 flex justify-center">
+                <button onclick="showLoginForm()" class="relative inline-block px-4 py-2 my-2 font-medium group">
+                    <span class="button1"></span>
+                    <span class="button2"></span>
+                    <span class="button3">Login</span>
+                </button>
+            </div>
+
+        <div id="loginForm" style="display: none;">
+            <form id="loginForm">
+                <label for="username">Username:</label>
+                <input class="border-2" type="text" id="username" name="username" required><br>
+
+                <label for="password">Password:</label>
+                <input class="border-2 my-2" type="password" id="password" name="password" required><br>
+
+                <button class="border-2 my-2" type="button" onclick="login()">Submit</button>
+            </form>
+        </div>
+        <button class="border-2 my-4" onclick="getUserInfo()">Get User Info</button>
+    </div>
+
     <div class="mx-4 text-center">
         <h3 class="font-bold">Test by clicking hi</h3>
         <div class="mx-4 flex justify-center">
@@ -118,6 +141,58 @@
                 </button>
             </div>
     </div>
+
+    <script>
+        function showLoginForm() {
+            const loginForm = document.getElementById("loginForm");
+            loginForm.style.display = (loginForm.style.display === "none") ? "block" : "none";
+        }
+        
+        async function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+        
+            const response = await fetch('/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+            });
+        
+            if (response.ok) {
+                const data = await response.json();
+                alert(`Login successful!\nAccess Token: ${data.access_token}`);
+                document.getElementById("loginForm").style.display = "none";
+            } else {
+                alert('Login failed. Please check your credentials.');
+            }
+        }
+
+        
+        async function getUserInfo() {
+            // console.log(credentials)
+            const response = await fetch('/users/me', {
+                method: 'GET',
+                credentials: 'include', // Include credentials (cookies) in the request
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Add any additional headers if needed
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`User Info:\n${JSON.stringify(data, null, 2)}`);
+            } else {
+                console.log(response)
+                alert('Failed to get user info. Please check your access token.');
+            }
+        }
+    </script>
+
+
+
 
     <script>
         document.getElementById("helloButton").addEventListener("click", async () => {

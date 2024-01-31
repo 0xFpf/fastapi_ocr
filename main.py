@@ -1,6 +1,11 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+import bcrypt
+from pydantic import BaseModel
+from datetime import datetime, timedelta
 from typing import Optional
 import edit
 import ocr
@@ -14,9 +19,130 @@ from sqlmodel import Session, select, delete
 from database import imageModel, engine
 from fastapi.middleware.cors import CORSMiddleware
 
+SECRET_KEY="xxx"
+ALGORITHM="xxx"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# data encoded by our token
+class TokenData(BaseModel):
+    username: str or None = None
+
+class User(BaseModel):
+    username: str
+    email: str or None = None
+    full_name: str or None = None
+    disabled: bool or None = None
+
+class UserInDB(User):
+    hashed_password: str
+
+oauth_2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+def verify_password(plain_password, hashed_password):
+    password_byte_enc = plain_password.encode('utf-8')
+    hashed_password=hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_byte_enc , hashed_password)
+
+def get_password_hash(password):
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password=pwd_bytes, salt=salt)
+    hashed_password = hashed_password.decode('utf-8')
+    return hashed_password
+
+def get_user(tmp_db, username:str):
+    if username in tmp_db:
+        user_data = tmp_db[username]
+        return UserInDB(**user_data)
+    
+def authenticate_user(tmp_db, username:str, password:str):
+    user = get_user(tmp_db, username)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+    
+def create_access_token(data: dict, expires_delta: timedelta or None=None):
+    to_encode=data.copy()
+    if expires_delta:
+        expire=datetime.utcnow()+expires_delta
+    else:
+        expire=datetime.utcnow()+timedelta(minutes=2)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(request: Request):
+    credential_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    try:
+        token = request.cookies.get("access_token")
+        if token is None:
+            raise credential_exception
+        if token.startswith("Bearer "):
+            token = token.split("Bearer ")[1]
+        payload= jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str=payload.get("sub")
+        if username is None:
+            raise credential_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        print("JWT error")
+        return credential_exception
+
+    user = get_user(tmp_db, username=token_data.username)
+    if user is None:
+        print("get_user is none")
+        raise credential_exception
+    return user
+
+# this filters out disabled=True users
+async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data:OAuth2PasswordRequestForm = Depends()):
+    user=authenticate_user(tmp_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Incorrect username or password", headers={"WWW-Authenticate":"Bearer"})
+    access_token_expires=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token= create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+
+    # Set the access token as an HTTP cookie with HttpOnly flag
+    response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        httponly=True,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 30,
+        expires=ACCESS_TOKEN_EXPIRE_MINUTES * 30,
+        path="/",
+    )
+    return response
+
+
+@app.get("/users/me", response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+@app.get("/users/me/items")
+async def read_own_items(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+# App gave me a CORS error when using ocr.py along with StreamingResponse, for now I'm using the below settings
+# Not sure what to set the origin as once it is in prod, for now allowing all origins.
+# Refactoring ocr.py into main would allow me to get rid of this.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,6 +177,13 @@ def get_session():
 async def hello(): 
     return {'message':'welcome human'}
 
+# @app.get("/login")
+# async def login(email: str = Form(...)):
+#     if email exists in database:
+#         find username then authenticate
+#     else:
+#         return {"message": "Check your email to finish logging in."}
+
 @app.post("/uploadfolder")
 async def upload_folder(file: UploadFile = File(...), session: Session = Depends(get_session)):
     try:
@@ -75,7 +208,8 @@ async def upload_folder(file: UploadFile = File(...), session: Session = Depends
         zip_path.unlink()
 
         # Filter out non-image files
-        # In future I may only take in jpeg or convert any png to jpeg before saving the image
+        # # In future I may only take in jpeg or convert any png to jpeg before saving the image
+        # # I could also implement multiple file uploads and use DropzoneJs for a better UX
         allowed_image_formats = ["jpeg", "jpg", "png"]
         
         image_list=[]
@@ -128,7 +262,7 @@ async def upload_folder(file: UploadFile = File(...), session: Session = Depends
     except Exception as e:
         return JSONResponse(content={"message": f"Failed to upload folder. Error: {str(e)}"}, status_code=500)
 
-# ocr.py will need to be integrated into this same script to avoid CORS issues while doing streaming response
+# ocr.py will need to be integrated into here to avoid CORS issues while streaming response
 @app.get("/sse/processimages")
 async def processimages(session: Session = Depends(get_session)):
     statement= select(imageModel.image_object)
