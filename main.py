@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie, Form
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -16,30 +16,15 @@ import csv
 from io import StringIO
 
 from sqlmodel import Session, select, delete
-from database import imageModel, engine
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound
+from database import imageModel, userModel, engine
 from fastapi.middleware.cors import CORSMiddleware
 
-SECRET_KEY="xxx"
-ALGORITHM="xxx"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-# data encoded by our token
-class TokenData(BaseModel):
-    username: str or None = None
-
-class User(BaseModel):
-    username: str
-    email: str or None = None
-    full_name: str or None = None
-    disabled: bool or None = None
-
-class UserInDB(User):
-    hashed_password: str
+from app.auth.auth_handler import decodeJWT, signJWT
+from app.auth.auth_bearer import jwt_bearer
+from app.schemas import Token, TokenData, User, UserInDB, UserCreate
+from decouple import config
+JWT_EXPIRES = int(config("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 oauth_2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -58,66 +43,65 @@ def get_password_hash(password):
     hashed_password = hashed_password.decode('utf-8')
     return hashed_password
 
-def get_user(tmp_db, username:str):
-    if username in tmp_db:
-        user_data = tmp_db[username]
-        return UserInDB(**user_data)
-    
-def authenticate_user(tmp_db, username:str, password:str):
-    user = get_user(tmp_db, username)
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+def get_user(username:str, session: Session = Depends(get_session)):
+    statement= select(userModel).where(userModel.username == username)
+    try:
+        user = session.exec(statement).one()
+        print(user)
+        return user
+    except NoResultFound:
+        return None
+    except MultipleResultsFound:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Two or more usernames exist')
+
+def authenticate_user(username:str, password:str, session: Session = Depends(get_session)):
+    user = get_user(username, session=session)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
         return False
     return user
-    
-def create_access_token(data: dict, expires_delta: timedelta or None=None):
-    to_encode=data.copy()
-    if expires_delta:
-        expire=datetime.utcnow()+expires_delta
-    else:
-        expire=datetime.utcnow()+timedelta(minutes=2)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def create_access_token(data: dict):
+    payload=data.copy()
+    expires_delta=timedelta(minutes=JWT_EXPIRES)
+    expire=datetime.utcnow()+expires_delta
+    payload.update({"exp": expire})
+    encoded_jwt = signJWT(payload)
     return encoded_jwt
 
-async def get_current_user(request: Request):
+async def get_current_user(token:str=Depends(jwt_bearer), session: Session = Depends(get_session)):
     credential_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
     try:
-        token = request.cookies.get("access_token")
-        if token is None:
-            raise credential_exception
-        if token.startswith("Bearer "):
-            token = token.split("Bearer ")[1]
-        payload= jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload= decodeJWT(token)
         username: str=payload.get("sub")
         if username is None:
             raise credential_exception
         token_data = TokenData(username=username)
-    except JWTError:
-        print("JWT error")
+    except:
         return credential_exception
 
-    user = get_user(tmp_db, username=token_data.username)
+    user = get_user(username=token_data.username, session=session)
     if user is None:
-        print("get_user is none")
         raise credential_exception
     return user
 
-# this filters out disabled=True users
 async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data:OAuth2PasswordRequestForm = Depends()):
-    user=authenticate_user(tmp_db, form_data.username, form_data.password)
+async def login_for_access_token(form_data:OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    user=authenticate_user(form_data.username, form_data.password, session=session)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Incorrect username or password", headers={"WWW-Authenticate":"Bearer"})
-    access_token_expires=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token= create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password", headers={"WWW-Authenticate":"Bearer"})
+    
+    access_token= create_access_token(data={"sub": user.username})
 
     # Set the access token as an HTTP cookie with HttpOnly flag
     response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
@@ -125,24 +109,16 @@ async def login_for_access_token(form_data:OAuth2PasswordRequestForm = Depends()
         key="access_token",
         value=f"Bearer {access_token}",
         httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 30,
-        expires=ACCESS_TOKEN_EXPIRE_MINUTES * 30,
+        max_age=JWT_EXPIRES * 2,
         path="/",
     )
     return response
-
 
 @app.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
-@app.get("/users/me/items")
-async def read_own_items(current_user: User = Depends(get_current_active_user)):
-    return current_user
-
-# App gave me a CORS error when using ocr.py along with StreamingResponse, for now I'm using the below settings
-# Not sure what to set the origin as once it is in prod, for now allowing all origins.
-# Refactoring ocr.py into main would allow me to get rid of this.
+# App gave me a CORS error when using ocr.py along with StreamingResponse. Would need to refactor ocr.py into main.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -150,7 +126,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # Define path for images folder and create if it doesn't exist
 images_dir = Path("images_dir")
@@ -169,22 +144,34 @@ def reset_dir():
 def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "data": data})
 
-def get_session():
-    with Session(engine) as session:
-        yield session
-
 @app.get("/hello")
 async def hello(): 
     return {'message':'welcome human'}
 
-# @app.get("/login")
-# async def login(email: str = Form(...)):
-#     if email exists in database:
-#         find username then authenticate
-#     else:
-#         return {"message": "Check your email to finish logging in."}
+def email_exists(email: str, session) -> bool:
+    statement = select(userModel).where(userModel.email == email)
+    result = session.exec(statement).fetchall()
+    return bool(result)
 
-@app.post("/uploadfolder")
+@app.post("/signup", status_code=status.HTTP_201_CREATED)
+def register_user(user: UserCreate, session: Session = Depends(get_session)):
+        # If db empty then add dictionary to db
+        hashed_password=get_password_hash(user.password)
+        user_dict = user.model_dump()
+        user_dict.pop("password")
+        user_dict["hashed_password"] = hashed_password
+        print(f"user data:{user_dict}")
+
+
+        if email_exists(user.email, session):
+            raise HTTPException(status_code=400, detail="Email already registered")
+        else:
+            new_user = userModel(**user_dict)
+            session.add(new_user)
+            session.commit()
+            return {"message": "New user added to database."}
+
+@app.post("/uploadfolder", status_code=status.HTTP_201_CREATED)
 async def upload_folder(file: UploadFile = File(...), session: Session = Depends(get_session)):
     try:
         # Resets subdirectory
@@ -207,9 +194,7 @@ async def upload_folder(file: UploadFile = File(...), session: Session = Depends
                         extracted_files.append(extracted_file)
         zip_path.unlink()
 
-        # Filter out non-image files
-        # # In future I may only take in jpeg or convert any png to jpeg before saving the image
-        # # I could also implement multiple file uploads and use DropzoneJs for a better UX
+        # # In future I may only take in jpeg or convert any png to jpeg before saving the image, could also implement multiple file uploads
         allowed_image_formats = ["jpeg", "jpg", "png"]
         
         image_list=[]
