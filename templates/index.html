@@ -152,14 +152,15 @@
             const username = document.getElementById("username").value;
             const password = document.getElementById("password").value;
         
-            const response = await fetch('/token', {
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            const response = await fetch('/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+                body: formData,
             });
-        
+
             if (response.ok) {
                 const data = await response.json();
                 alert(`Login successful!\nAccess Token: ${data.access_token}`);
@@ -171,14 +172,9 @@
 
         
         async function getUserInfo() {
-            // console.log(credentials)
+
             const response = await fetch('/users/me', {
                 method: 'GET',
-                credentials: 'include', // Include credentials (cookies) in the request
-                headers: {
-                    'Content-Type': 'application/json',
-                    // Add any additional headers if needed
-                },
             });
 
             if (response.ok) {
@@ -209,7 +205,7 @@
             if (!eventSource) {
                 convertButton_animation.classList.remove('hidden');
 
-                eventSource = new EventSource('http://localhost:8000/sse/processimages');
+                eventSource = new EventSource('/sse/processimages');
                 document.getElementById('resultContainer2').innerHTML = '';
                 const outputDiv = document.getElementById('resultContainer2');
 

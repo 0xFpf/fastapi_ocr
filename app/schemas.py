@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, NaiveDatetime
 
 class Token(BaseModel):
     access_token: str
@@ -22,8 +22,30 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    disabled: bool = False
 
+class UserOut(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    full_name: str
+
+    class Config:
+        orm_model = True
+
+# not implemented atm, might delete
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+
+# class UserAll(BaseModel):
+#     id:int
+#     email: EmailStr
+#     full_name:str
+#     created_at: NaiveDatetime
+#     hashed_password: str
+#     username: str
+#     disabled: bool
+
+#     class Config:
+#         orm_model = True
