@@ -1,9 +1,9 @@
 import easyocr
 from pathlib import Path
-import edit
+import app.edit_image as edit_image
 
 from sqlmodel import Session, select
-from database import imageModel, engine
+from app.database import imageModel, engine
 
 current_path = Path.cwd()
 ocr_model= easyocr.Reader(['en'], gpu=False, model_storage_directory=current_path / 'easyocr' ,download_enabled=False)
@@ -15,7 +15,7 @@ async def read_image(image_binary_dataset : list):
     progress=0
     picdata=[]
     for binary_image in image_binary_dataset:
-        image=edit.convert_to_image(binary_image)
+        image=edit_image.convert_to_image(binary_image)
         yield f'data: {{"message": "progress is @ {int(progress)}%"}}\n\n'
         try:
             result = ocr_model.readtext(image)
