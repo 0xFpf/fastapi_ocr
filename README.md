@@ -4,6 +4,10 @@ This is an implementation of some elements from my OCR & NLP Search Engine proje
 
 Its goal is to be able to extract text from images in bulk.
 
+This does not make use of any third party api's.
+
+At the time the idea was conceived there were no websites that allowed in-bulk OCR solutions.
+
 Here's a Demo as of 27/12/23:
 
 
