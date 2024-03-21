@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie, Form, Query
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional, Union
@@ -148,6 +148,21 @@ async def loadtable(request: Request, hx_request: Optional[str] = Header(None), 
         data = {'name': item[0], 'text': item[1]}
         textitems.append(data)
     # creates context dict, loads request and json data, passes 'context' to table.html
+    context={'request':request, 'textitems':textitems}
+    if hx_request:
+        return templates.TemplateResponse("table.html", context)
+    raise HTTPException(status_code=404, detail="Images text output not found, process some images and try again.")
+
+
+@app.get('/search', response_class=HTMLResponse)
+async def loadtable(request: Request, hx_request: Optional[str] = Header(None), session: Session = Depends(get_session), current_user: User = Depends(get_current_active_user), query: Optional[str] = Query(None)):
+    owner_id=current_user.id
+    statement= select(imageModel.name, imageModel.text).where((imageModel.owner_id == owner_id) & (imageModel.text.like(f'%{query}%')))
+    results = session.exec(statement).all()
+    textitems=[]
+    for item in results:
+        data = {'name': item[0], 'text': item[1]}
+        textitems.append(data)
     context={'request':request, 'textitems':textitems}
     if hx_request:
         return templates.TemplateResponse("table.html", context)

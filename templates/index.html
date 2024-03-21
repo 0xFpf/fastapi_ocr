@@ -111,6 +111,17 @@
             </button>
         </div>
         <div id="resultContainer2" class="mx-4 my-4 text-center"></div>
+        <div id="resultContainer3" class="mx-4 my-4 text-center">
+            <form hx-get="/search" hx-trigger="submit" hx-target="#table-body">
+                <input type="text" id="searchInput" placeholder="Enter search term..." name="query">
+                <button id='searchButton' type="submit" class="relative inline-block px-4 py-2 font-medium group">
+                    <span class="button1"></span>
+                    <span class="button2"></span>
+                    <span class="button3">Search</span>
+                </button>
+            </form>
+            
+        </div>
     </div>
 
     <div class="mx-4"> 
@@ -132,7 +143,7 @@
                     hx-swap="beforestart">
                     <span class="button1"></span>
                     <span class="button2"></span>
-                    <span class="button3">Load</span>
+                    <span class="button3">Load All</span>
                 </button>
                 <button class="relative inline-block mx-2 px-4 py-2 font-medium group" onclick="downloadCsv()">
                     <span class="button1"></span>
