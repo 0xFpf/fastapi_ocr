@@ -4,7 +4,7 @@ This is an implementation of some elements from my OCR & NLP Search Engine proje
 
 Its goal is to be able to extract text from images in bulk.
 
-This does not make use of any third party api's.
+This does not make use of any third party api's or fastapi extension libraries such as Fastapi-Users.
 
 At the time the idea was conceived there were no websites that allowed in-bulk OCR solutions.
 

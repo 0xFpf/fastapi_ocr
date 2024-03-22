@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI OCR - Login</title>
+    <script src="https://unpkg.com/htmx.org@1.6.1"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* button styling & animation */
+        .button1 {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 200ms ease-out;
+            transform: translateX(3px) translateY(3px);
+            background-color: black;
+        }
+        .button2 {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            border: 2px solid black;
+        }
+        .button3 {
+            position: relative;
+            color: black;
+        }
+        .group:hover .button1 {
+            transform: translateX(0) translateY(0);
+        }
+        .group:hover .button2 {
+            background-color: black;
+        }
+        .group:hover .button3 {
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 class="text-xl font-bold flex justify-center my-4">Welcome to an Image to Text online OCR</h1>
+    <br>
+    <div class="mx-4 my-6 text-center">
+        <h3 class="font-bold">Login form</h3>
+            <div class="mx-4 flex justify-center">
+                <button onclick="showLoginForm()" class="relative inline-block px-4 py-2 my-2 font-medium group">
+                    <span class="button1"></span>
+                    <span class="button2"></span>
+                    <span class="button3">Login</span>
+                </button>
+            </div>
+
+        <div id="loginForm" style="display: none;">
+            <form id="loginForm">
+                <label for="username">Username:</label>
+                <input class="border-2 mx-1 my-2" type="text" id="username" name="username" required><br>
+
+                <label for="password">Password:</label>
+                <input class="border-2 mx-1 my-2" type="password" id="password" name="password" required><br>
+
+                <button class="relative inline-block px-4 py-2 my-2 font-medium group" type="button" onclick="login()">
+                    <span class="button1"></span>
+                    <span class="button2"></span>
+                    <span class="button3">Submit</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="mx-4 text-center">
+        <h3 class="font-bold">Sign Up form</h3>
+        <div class="mx-4 flex justify-center">
+            <button id="signupButton" class="relative inline-block px-4 py-2 my-2 font-medium group">
+                <span class="button1"></span>
+                <span class="button2"></span>
+                <span class="button3">Sign Up</span>
+            </button>
+        </div>
+        <div id="resultContainer"></div>
+        <br>
+    </div>
+    
+
+    <script>
+        function showLoginForm() {
+            const loginForm = document.getElementById("loginForm");
+            loginForm.style.display = (loginForm.style.display === "none") ? "block" : "none";
+        }
+        
+        async function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+        
+            if (!username || !password) {
+                alert("Please enter both username and password.");
+                return;
+            }
+
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`Login successful!`);
+                window.location.href = '/';
+            } else {
+                alert('Login failed. Please check your credentials.');
+            }
+        }
+
+    </script>
+
+    <script>
+        document.getElementById("signupButton").addEventListener("click", async () => {
+            document.getElementById('resultContainer').innerHTML = '';
+            const response = await fetch("/register");
+            const data = await response.json();
+            document.getElementById("resultContainer").innerText = data.message;
+        });
+    </script>
+
+</body>
+</html>

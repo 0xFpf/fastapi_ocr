@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie, Form, Query
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional, Union
 import shutil
@@ -40,8 +40,12 @@ def reset_dir():
             elif item.is_file():
                 item.unlink()
 
+@app.get("/login")
+async def login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
 @app.get("/")
-def read_root(request: Request):
+def read_root(request: Request, _ = Depends(get_current_active_user)):
     return templates.TemplateResponse("index.html", {"request": request, "data": data})
 
 @app.get("/hello", status_code=status.HTTP_200_OK)

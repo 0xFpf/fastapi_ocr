@@ -44,30 +44,7 @@
 
 <body>
     <h1 class="text-xl font-bold flex justify-center my-4">Welcome to an Image to Text online OCR</h1>
-    <div class="mx-4 my-4 text-center">
-        <h3 class="font-bold">Login form</h3>
-            <div class="mx-4 flex justify-center">
-                <button onclick="showLoginForm()" class="relative inline-block px-4 py-2 my-2 font-medium group">
-                    <span class="button1"></span>
-                    <span class="button2"></span>
-                    <span class="button3">Login</span>
-                </button>
-            </div>
-
-        <div id="loginForm" style="display: none;">
-            <form id="loginForm">
-                <label for="username">Username:</label>
-                <input class="border-2" type="text" id="username" name="username" required><br>
-
-                <label for="password">Password:</label>
-                <input class="border-2 my-2" type="password" id="password" name="password" required><br>
-
-                <button class="border-2 my-2" type="button" onclick="login()">Submit</button>
-            </form>
-        </div>
-        <button class="border-2 my-4" onclick="getUserInfo()">Get User Info</button>
-    </div>
-
+    
     <div class="mx-4 text-center">
         <h3 class="font-bold">Test by clicking hi</h3>
         <div class="mx-4 flex justify-center">
@@ -78,8 +55,16 @@
             </button>
         </div>
         <div id="resultContainer"></div>
-        <br>
     </div>
+
+    <div class="mx-4 my-4 text-center">
+        <button id="getUserButton" class="relative inline-block px-4 py-2 my-2 font-medium group" onclick="getUserInfo()">
+            <span class="button1"></span>
+            <span class="button2"></span>
+            <span class="button3">Get User Info</span>
+        </button>
+    </div>
+
     <div class="mx-4 text-center">
         <h3 class="font-bold">Upload images as a zip folder here</h3>
         <div class="mx-4 flex justify-center">
@@ -113,7 +98,7 @@
         <div id="resultContainer2" class="mx-4 my-4 text-center"></div>
         <div id="resultContainer3" class="mx-4 my-4 text-center">
             <form hx-get="/search" hx-trigger="submit" hx-target="#table-body">
-                <input type="text" id="searchInput" placeholder="Enter search term..." name="query">
+                <input class="border-b-2 border-black outline-none pb-2 pl-1 mr-2" type="text" id="searchInput" placeholder="Enter search term..." name="query">
                 <button id='searchButton' type="submit" class="relative inline-block px-4 py-2 font-medium group">
                     <span class="button1"></span>
                     <span class="button2"></span>
@@ -154,41 +139,17 @@
     </div>
 
     <script>
-        function showLoginForm() {
-            const loginForm = document.getElementById("loginForm");
-            loginForm.style.display = (loginForm.style.display === "none") ? "block" : "none";
-        }
-        
-        async function login() {
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
-        
-            const formData = new URLSearchParams();
-            formData.append('username', username);
-            formData.append('password', password);
-
-            const response = await fetch('/login', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                alert(`Login successful!\nAccess Token: ${data.access_token}`);
-                document.getElementById("loginForm").style.display = "none";
-            } else {
-                alert('Login failed. Please check your credentials.');
-            }
-        }
-
-        
         async function getUserInfo() {
 
             const response = await fetch('/users/me', {
                 method: 'GET',
             });
-
-            if (response.ok) {
+            if (response.status === 200) {
+                if (response.url.includes('/login')) {
+                    alert('Your session has expired, please log in again.');
+                    window.location.href = response.url;
+                    return;
+                }
                 const data = await response.json();
                 alert(`User Info:\n${JSON.stringify(data, null, 2)}`);
             } else {
@@ -199,7 +160,17 @@
     </script>
 
 
-
+    <script>
+        document.addEventListener('htmx:afterRequest', function(event) {
+        var xhr = event.detail.xhr;
+        console.log('Response status:', event.detail.xhr.responseURL);
+        if (event.detail.xhr.responseURL.includes('/login')) {
+            alert('Your session has expired, please log in again.');
+            console.log('Redirecting...');
+            window.location.href = event.detail.xhr.responseURL;
+            }
+        });
+    </script>
 
     <script>
         document.getElementById("helloButton").addEventListener("click", async () => {
@@ -252,7 +223,14 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (response.url.includes('/login')) {
+                    alert('Your session has expired, please log in again.');
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.json();
+            })
             .then(data => {
                 document.getElementById('responseContainer').innerHTML = data.message;
             })
@@ -267,6 +245,11 @@
             const response = await fetch('/download-csv');
             
             if (response.ok){
+                if (response.url.includes('/login')) {
+                    alert('Your session has expired, please log in again.');
+                    window.location.href = response.url;
+                    return;
+                }
                 const blob = await response.blob();
 
                 // Create a link element and trigger the download
@@ -277,7 +260,6 @@
                 document.body.appendChild(a);
                 a.click();
 
-                // Cleanup
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
             }

@@ -37,7 +37,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED, response_model=UserOut)
 def register_user(user: UserCreate, session: Session = Depends(get_session)):
-        # If db empty then add dictionary to db
+
         hashed_password=get_password_hash(user.password)
         user_dict = user.model_dump()
         user_dict.pop("password")
@@ -53,3 +53,7 @@ def register_user(user: UserCreate, session: Session = Depends(get_session)):
             session.commit()
             session.refresh(new_user)
             return new_user
+        
+@router.get("/register")
+async def register():
+    return {'message':'Sorry, registration is disabled at the moment, please contact administrator to get registered.'}
