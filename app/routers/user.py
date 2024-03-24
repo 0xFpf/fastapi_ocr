@@ -8,6 +8,9 @@ from app.database import userModel, get_session
 from app.utils import get_password_hash
 from app.auth.auth_handler import create_access_token
 from app.auth.auth_operations import email_exists, authenticate_user, get_current_active_user
+from decouple import config
+
+JWT_EXPIRES=int(config("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 router = APIRouter()
 
@@ -20,13 +23,12 @@ async def login_for_access_token(form_data:OAuth2PasswordRequestForm = Depends()
     
     access_token= create_access_token(data={"sub": user.username})
 
-    # Set the access token as an HTTP cookie with HttpOnly flag
     response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
     response.set_cookie(
         key="access_token",
         value=f"Bearer {access_token}",
         httponly=True,
-        max_age=60 * 10, # 10 min
+        max_age= (JWT_EXPIRES * 60)/60, # 1 min
         path="/",
     )
     return response

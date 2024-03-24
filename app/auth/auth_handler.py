@@ -37,7 +37,7 @@ def decodeJWT(token: str) -> dict:
 
 def create_access_token(data: dict) -> str:
     payload=data.copy()
-    expires_delta=timedelta(minutes=JWT_EXPIRES*1)
+    expires_delta=timedelta(seconds=JWT_EXPIRES)
     expire=datetime.now(timezone.utc)+expires_delta
     payload.update({"exp": expire})
     encoded_jwt = signJWT(payload)

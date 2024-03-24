@@ -2,7 +2,7 @@ from fastapi import HTTPException, Depends, status
 from typing import Optional, Union
 from sqlmodel import Session, select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
-from app.schemas import Token, TokenData, User, UserInDB, UserCreate, UserOut
+from app.schemas import Token, TokenData, User, UserInDB
 from app.database import userModel, get_session
 from app.utils import verify_password
 from app.auth.auth_handler import decodeJWT

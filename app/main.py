@@ -11,7 +11,7 @@ from io import StringIO
 from sqlmodel import Session, select, delete
 from app.database import imageModel, userModel, get_session
 
-import app.edit_image as edit_image, app.ocr as ocr
+import app.edit_image as edit_image, app.ocrapi as ocrapi
 from app.auth.auth_bearer import OAuth2PasswordBearerWithCookie
 from app.schemas import Token, TokenData, User, UserInDB, UserCreate, UserOut
 from app.auth.auth_operations import get_current_active_user
@@ -27,7 +27,7 @@ app.include_router(user.router)
 
 
 
-# #not sure if this needs deprecation: Define path for images folder and create if it doesn't exist + reset directory
+# not sure how to deprecate this yet. Don't want to use redis.
 images_dir = Path("images_dir")
 images_dir.mkdir(exist_ok=True)
 data=None
@@ -108,9 +108,8 @@ async def upload_folder(file: UploadFile = File(...), current_user: User = Depen
 
         # If db is equal to images extracted then ignore and skip
         elif existing_entries.name==byteimage_list[0]['name']:
-            print('result==byteimage_list')
             reset_dir()
-            return {"message": "Database full, skipping operation."}
+            return {"message": "Images already present in DB, skipping operation."}
         
         # If db exists but images are new then clear the db and add new images
         else:
@@ -138,7 +137,7 @@ async def processimages(current_user: User = Depends(get_current_active_user), s
     statement= select(imageModel.image_object).where(imageModel.owner_id == owner_id)
     results = session.exec(statement).all()
     if results:
-        return StreamingResponse(ocr.read_image(results), media_type="text/event-stream")
+        return StreamingResponse(ocrapi.read_image(results), media_type="text/event-stream")
     else:
         return {"message": "Err 404, Images not found."}
 

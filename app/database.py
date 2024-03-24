@@ -1,13 +1,11 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel, create_engine, Session, ForeignKey, Relationship
-
+from decouple import config
 # DB_URL=f'sqlite://{settings.database_username}:{settings.database_password}@{settings.database_hostname}:{settings.database_port}/{settings.database_name}'
-DB_URL= 'db.sqlite3'
+DB_URL= config("DB_URL")
 engine = create_engine(f"sqlite:///{DB_URL}", echo=True)
 
-# class Base(SQLModel):
-#     pass
 class userModel(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
@@ -15,7 +13,7 @@ class userModel(SQLModel, table=True):
     hashed_password: str
     full_name: str
     disabled: bool = False
-    created_at: datetime = Field(default=datetime.utcnow())
+    created_at: datetime = Field(default=datetime.now(timezone.utc))
     # images: List["imageModel"] = Relationship("imageModel", back_populates="user")
     
 class imageModel(SQLModel, table=True):

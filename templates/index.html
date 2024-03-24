@@ -109,7 +109,7 @@
         </div>
     </div>
 
-    <div class="mx-4"> 
+    <div class="max-w-screen-xl mx-4 mx-auto"> 
         <p class="text-xl font-bold mb-4 text-center">Results Table</p>
             <table class="mx-auto min-w-[50%] mb-4">
                 <thead class="border-b text-lg">
@@ -192,6 +192,7 @@
                 const outputDiv = document.getElementById('resultContainer2');
 
                 eventSource.onmessage = (event) => {
+                    console.log(event)
                     const data = JSON.parse(event.data);
                     if (data.event === "close") {
                         console.log("Received close event. Closing connection.");
