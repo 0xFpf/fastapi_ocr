@@ -1,10 +1,8 @@
 from typing import Optional, List
 from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel, create_engine, Session, ForeignKey, Relationship
-from decouple import config
 
-DB_URL= config("DB_URL")
-engine = create_engine(f"sqlite:///{DB_URL}", echo=True)
+engine = create_engine("sqlite:///db.sqlite3", echo=True)
 
 class userModel(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
