@@ -3,10 +3,11 @@ FROM python:3.10.5-slim
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
+COPY alembic.ini /usr/src/app/alembic.ini
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN alembic upgrade head
+RUN alembic -c /usr/src/app/alembic.ini upgrade head
 
 COPY . .
 
