@@ -87,6 +87,10 @@ async def upload_folder(file: UploadFile = File(...), current_user: User = Depen
             else:
                 print(f"Invalid file format. file name: {file.name}. File has been removed")
                 file.unlink()
+        
+        if len(image_list)>10:
+            reset_dir()
+            return {"message": "Too many images in folder, please upload 10 or less pictures."}
 
         owner_id=current_user.id
       

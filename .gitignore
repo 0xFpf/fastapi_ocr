@@ -6,3 +6,5 @@ images_dir/
 db.sqlite3
 .env
 *.json
+alembic/
+*.yml

@@ -67,6 +67,7 @@
 
     <div class="mx-4 text-center">
         <h3 class="font-bold">Upload images as a zip folder here</h3>
+        <h3 class="mb-1">Due to API limits you may only upload up to 10 images.</h3>
         <div class="mx-4 flex justify-center">
             <form id="uploadForm" enctype="multipart/form-data">
                 <label for="file">Choose a file:</label>
@@ -185,32 +186,46 @@
         let eventSource;
         document.getElementById('convertButton').addEventListener('click', () => {
             if (!eventSource) {
-                convertButton_animation.classList.remove('hidden');
 
-                eventSource = new EventSource('/sse/processimages');
-                document.getElementById('resultContainer2').innerHTML = '';
-                const outputDiv = document.getElementById('resultContainer2');
+                fetch('/sse/processimages')
+                    .then(response => {
+                        if (response.url.includes('/login')) {
+                            alert('Your session has expired, please log in again.');
+                            window.location.href = response.url;
+                            return;
+                        }
+                        else {
 
-                eventSource.onmessage = (event) => {
-                    console.log(event)
-                    const data = JSON.parse(event.data);
-                    if (data.event === "close") {
-                        console.log("Received close event. Closing connection.");
-                        convertButton_animation.classList.add('hidden');
-                        eventSource.close();
-                    } else {
-                        console.log(data.message)
-                        outputDiv.innerText = data.message;
-                    };
-                }
+                        convertButton_animation.classList.remove('hidden');
 
-                eventSource.onerror = (error) => {
-                    console.error('EventSource failed:', error);
-                    eventSource.close();
-                };
+                        eventSource = new EventSource('/sse/processimages');
+                        document.getElementById('resultContainer2').innerHTML = '';
+                        const outputDiv = document.getElementById('resultContainer2');
 
+                        eventSource.onmessage = (event) => {
+                            console.log(event)
+                            const data = JSON.parse(event.data);
+                            if (data.event === "close") {
+                                console.log("Received close event. Closing connection.");
+                                convertButton_animation.classList.add('hidden');
+                                eventSource.close();
+                            } else {
+                                console.log(data.message)
+                                outputDiv.innerText = data.message;
+                            };
+                        }
+
+                        eventSource.onerror = (error) => {
+                            console.log(error.status)
+                            console.error('EventSource failed:', error);
+                            convertButton_animation.classList.add('hidden');
+                            eventSource.close();
+                        };
+
+                    }
+                });
             }
-        });
+        })
     </script>
 
     <script>
