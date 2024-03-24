@@ -3,7 +3,6 @@ __pycache__/
 .venv/
 easyocr/
 images_dir/
-db.sqlite3
 .env
 *.json
 *.yml

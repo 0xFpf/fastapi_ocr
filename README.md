@@ -13,3 +13,9 @@ Here's a Demo as of 27/12/23:
 
 https://github.com/0xFpf/fastapi_ocr/assets/74162889/48658952-c181-4d34-aca7-cef4b319783c
 
+
+Update:
+
+You can now test the app at: https://fastocr.onrender.com/
+Please be warned it is slow as it on a free tier solution.
+I have moved the OCR from easyocr to google's third party api to speed up processing+response times.
