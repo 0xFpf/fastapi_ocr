@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Header, status, Cookie, Form, Query
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional, Union
 import shutil
@@ -25,7 +25,9 @@ templates = Jinja2Templates(directory="templates")
 
 app.include_router(user.router)
 
-
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return FileResponse('app/favicon.ico')
 
 # not sure how to deprecate this yet. Don't want to use redis.
 images_dir = Path("images_dir")
@@ -50,7 +52,7 @@ def read_root(request: Request, _ = Depends(get_current_active_user)):
 
 @app.get("/hello", status_code=status.HTTP_200_OK)
 async def hello(): 
-    return {'message':'welcome human'}
+    return HTMLResponse(content="Welcome human!<br> Step 1: Get your pictures ready and put them in a zip<br> Step 2: Select them with the 'Browse' button and click 'Upload File'<br> Step 3: Click 'Process Images' to convert the uploaded images to text<br> Done! Now you can search, load or download the text :)")
 
 @app.post("/uploadfolder", status_code=status.HTTP_201_CREATED)
 async def upload_folder(file: UploadFile = File(...), current_user: User = Depends(get_current_active_user), session: Session = Depends(get_session)):
@@ -90,7 +92,7 @@ async def upload_folder(file: UploadFile = File(...), current_user: User = Depen
         
         if len(image_list)>10:
             reset_dir()
-            return {"message": "Too many images in folder, please upload 10 or less pictures."}
+            return HTMLResponse(content="Too many images in folder, please upload 10 or less pictures.")
 
         owner_id=current_user.id
       
@@ -113,7 +115,7 @@ async def upload_folder(file: UploadFile = File(...), current_user: User = Depen
         # If db is equal to images extracted then ignore and skip
         elif existing_entries.name==byteimage_list[0]['name']:
             reset_dir()
-            return {"message": "Images already present in DB, skipping operation."}
+            return HTMLResponse(content="Images already present in DB, skipping operation.")
         
         # If db exists but images are new then clear the db and add new images
         else:
@@ -129,7 +131,7 @@ async def upload_folder(file: UploadFile = File(...), current_user: User = Depen
             reset_dir()
         
 
-        return {"message": f"Folder uploaded, {len(extracted_files)} files extracted."}
+        return HTMLResponse(content=f"Folder uploaded, {len(image_list)} images extracted.")
     
     except Exception as e:
         return JSONResponse(content={"message": f"Failed to upload folder. Error: {str(e)}"}, status_code=500)
@@ -138,13 +140,16 @@ async def upload_folder(file: UploadFile = File(...), current_user: User = Depen
 @app.get("/sse/processimages")
 async def processimages(current_user: User = Depends(get_current_active_user), session: Session = Depends(get_session)):
     owner_id=current_user.id
-    statement= select(imageModel.image_object).where(imageModel.owner_id == owner_id)
-    results = session.exec(statement).all()
-    if results:
+    statement= select(imageModel.text).where(imageModel.owner_id == owner_id)
+    existing_text=session.exec(statement).first()
+    if existing_text:
+        results=None
         return StreamingResponse(ocrapi.read_image(results), media_type="text/event-stream")
     else:
-        return {"message": "Err 404, Images not found."}
-
+        statement= select(imageModel.image_object).where(imageModel.owner_id == owner_id)
+        results = session.exec(statement).all()
+        return StreamingResponse(ocrapi.read_image(results), media_type="text/event-stream")
+        
 @app.get('/loadtable', response_class=HTMLResponse)
 async def loadtable(request: Request, hx_request: Optional[str] = Header(None), session: Session = Depends(get_session), current_user: User = Depends(get_current_active_user)):
     owner_id=current_user.id

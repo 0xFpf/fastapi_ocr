@@ -39,6 +39,10 @@
         .group:hover .button3 {
             color: white;
         }
+        /* dialog custom overlay */
+        dialog::backdrop {
+            background-color: rgba(3, 3, 3, 0.6);
+        }
     </style>
 </head>
 
@@ -55,15 +59,13 @@
                 </button>
             </div>
 
-        <div id="loginForm" style="display: none;">
-            <form id="loginForm">
-                <label for="username">Username:</label>
-                <input class="border-2 mx-1 my-2" type="text" id="username" name="username" required><br>
+        <div id="loginForm" style="display: none;" class="mx-4 my-4 text-center">
+            <form id="loginForm" hx-post="/login" hx-trigger="submit">
 
-                <label for="password">Password:</label>
-                <input class="border-2 mx-1 my-2" type="password" id="password" name="password" required><br>
+                <input class="border-b-2 border-black outline-none pb-2 pl-1 mr-2" placeholder="Enter Username..." type="text" id="username" name="username" required><br>
+                <input class="border-b-2 border-black outline-none pb-2 pl-1 mr-2" placeholder="Enter Password..." type="password" id="password" name="password" required><br>
 
-                <button class="relative inline-block px-4 py-2 my-2 font-medium group" type="button" onclick="login()">
+                <button class="relative inline-block px-4 py-2 my-2 font-medium group" type="submit">
                     <span class="button1"></span>
                     <span class="button2"></span>
                     <span class="button3">Submit</span>
@@ -75,7 +77,7 @@
     <div class="mx-4 text-center">
         <h3 class="font-bold">Sign Up form</h3>
         <div class="mx-4 flex justify-center">
-            <button id="signupButton" class="relative inline-block px-4 py-2 my-2 font-medium group">
+            <button id="signupButton" class="relative inline-block px-4 py-2 my-2 font-medium group" hx-get="/register" hx-target="#resultContainer" hx-swap="beforestart">
                 <span class="button1"></span>
                 <span class="button2"></span>
                 <span class="button3">Sign Up</span>
@@ -83,52 +85,43 @@
         </div>
         <div id="resultContainer"></div>
         <br>
+        <dialog data-modal class="modal border-2 border-black p-4">
+            <div id="defModal" class="p-2">...</div>
+            <button data-close-modal class="border-2 border-black p-2">Close</button>
+        </dialog>
     </div>
     
 
     <script>
+        var verified = false
+        const modal = document.querySelector("[data-modal]")
+        const closeButton = document.querySelector("[data-close-modal]")
+        closeButton.addEventListener('click', () => {
+            modal.close();
+            if (verified===true){
+                window.location.href = '/';
+            }
+        });
+
+
         function showLoginForm() {
             const loginForm = document.getElementById("loginForm");
             loginForm.style.display = (loginForm.style.display === "none") ? "block" : "none";
         }
-        
-        async function login() {
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
-        
-            if (!username || !password) {
-                alert("Please enter both username and password.");
-                return;
+
+        htmx.on('htmx:beforeSwap', function(event) {
+            if (event.detail.xhr.responseURL.includes('/login')) {
+                if (event.detail.xhr.status === 200) {
+                    event.detail.shouldSwap = false;
+                    verified=true
+                    document.getElementById("defModal").innerHTML = 'Login successful!';
+                } else {
+                    document.getElementById("defModal").innerHTML = 'Login failed. Please check your credentials.';
+                }
+                modal.showModal();
             }
-
-            const formData = new URLSearchParams();
-            formData.append('username', username);
-            formData.append('password', password);
-
-            const response = await fetch('/login', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                alert(`Login successful!`);
-                window.location.href = '/';
-            } else {
-                alert('Login failed. Please check your credentials.');
-            }
-        }
-
-    </script>
-
-    <script>
-        document.getElementById("signupButton").addEventListener("click", async () => {
-            document.getElementById('resultContainer').innerHTML = '';
-            const response = await fetch("/register");
-            const data = await response.json();
-            document.getElementById("resultContainer").innerText = data.message;
         });
-    </script>
+    </script> 
 
 </body>
 </html>

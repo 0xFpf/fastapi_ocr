@@ -39,6 +39,10 @@
         .group:hover .button3 {
             color: white;
         }
+        /* dialog custom overlay */
+        dialog::backdrop {
+            background-color: rgba(3, 3, 3, 0.6);
+        }
     </style>
 </head>
 
@@ -46,19 +50,27 @@
     <h1 class="text-xl font-bold flex justify-center my-4">Welcome to an Image to Text online OCR</h1>
     
     <div class="mx-4 text-center">
-        <h3 class="font-bold">Test by clicking hi</h3>
+        
         <div class="mx-4 flex justify-center">
-            <button id="helloButton" class="relative inline-block px-4 py-2 my-2 font-medium group">
+            <button id="helloButton" class="relative inline-block px-4 py-2 my-2 font-medium group"
+            data-open-modal
+            hx-get="/hello"
+            hx-target="#defModal"
+            hx-swap="beforestart">
                 <span class="button1"></span>
                 <span class="button2"></span>
-                <span class="button3">Say hi</span>
+                <span class="button3">Instructions for use</span>
             </button>
         </div>
-        <div id="resultContainer"></div>
+        <div id="helloContainer"></div>
     </div>
 
     <div class="mx-4 my-4 text-center">
-        <button id="getUserButton" class="relative inline-block px-4 py-2 my-2 font-medium group" onclick="getUserInfo()">
+        <button id="getUserButton" class="relative inline-block px-4 py-2 my-2 font-medium group" 
+        data-open-modal
+        hx-get="/users/me"
+        hx-target="#defModal"
+        hx-swap="beforestart">
             <span class="button1"></span>
             <span class="button2"></span>
             <span class="button3">Get User Info</span>
@@ -73,7 +85,11 @@
                 <label for="file">Choose a file:</label>
                 <input type="file" name="file" id="file" accept=".zip">
                 <div class="mx-4 flex justify-center">
-                    <button type="button" onclick="uploadFile()" class="relative px-4 py-2 my-2 font-medium group flex justify-center">
+                    <button type="button" class="relative px-4 py-2 my-2 font-medium group flex justify-center"
+                    hx-post="/uploadfolder"
+                    hx-target="#responseContainer"
+                    hx-encoding="multipart/form-data"
+                    hx-include="[name='file']">
                         <span class="button1"></span>
                         <span class="button2"></span>
                         <span class="button3">Upload File</span>
@@ -98,7 +114,7 @@
         </div>
         <div id="resultContainer2" class="mx-4 my-4 text-center"></div>
         <div id="resultContainer3" class="mx-4 my-4 text-center">
-            <form hx-get="/search" hx-trigger="submit" hx-target="#table-body">
+            <form hx-get="/search" hx-trigger="submit" htmx:afterRequest="handleResponse(event)" hx-target="#table-body">
                 <input class="border-b-2 border-black outline-none pb-2 pl-1 mr-2" type="text" id="searchInput" placeholder="Enter search term..." name="query">
                 <button id='searchButton' type="submit" class="relative inline-block px-4 py-2 font-medium group">
                     <span class="button1"></span>
@@ -106,7 +122,6 @@
                     <span class="button3">Search</span>
                 </button>
             </form>
-            
         </div>
     </div>
 
@@ -137,123 +152,90 @@
                     <span class="button3">Download CSV</span>
                 </button>
             </div>
+
+            <dialog data-modal class="modal border-2 border-black p-4">
+                <div id="defModal" class="p-2">...</div>
+                <button data-close-modal class="border-2 border-black p-2">Close</button>
+            </dialog>
     </div>
 
-    <script>
-        async function getUserInfo() {
 
-            const response = await fetch('/users/me', {
-                method: 'GET',
+
+    <script>
+        // could use popovers instead of modals, but not sure how well they're supported by browsers yet
+        // const modal = document.getElementById() use this for unique modals.
+        const modal = document.querySelector("[data-modal]")
+        const openButtons = document.querySelectorAll("[data-open-modal]")
+        const closeButton = document.querySelector("[data-close-modal]")
+
+        openButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                modal.showModal();
             });
-            if (response.status === 200) {
-                if (response.url.includes('/login')) {
-                    alert('Your session has expired, please log in again.');
-                    window.location.href = response.url;
-                    return;
-                }
-                const data = await response.json();
-                alert(`User Info:\n${JSON.stringify(data, null, 2)}`);
-            } else {
-                console.log(response)
-                alert('Failed to get user info. Please check your access token.');
-            }
-        }
-    </script>
-
-
-    <script>
-        document.addEventListener('htmx:afterRequest', function(event) {
-        var xhr = event.detail.xhr;
-        console.log('Response status:', event.detail.xhr.responseURL);
-        if (event.detail.xhr.responseURL.includes('/login')) {
-            alert('Your session has expired, please log in again.');
-            console.log('Redirecting...');
-            window.location.href = event.detail.xhr.responseURL;
-            }
+        });
+        closeButton.addEventListener('click', () => {
+            modal.close();
+            document.getElementById("defModal").innerHTML = ''
         });
     </script>
 
     <script>
-        document.getElementById("helloButton").addEventListener("click", async () => {
-            document.getElementById('resultContainer').innerHTML = '';
-            const response = await fetch("/hello");
-            const data = await response.json();
-            document.getElementById("resultContainer").innerText = data.message;
+        htmx.on('htmx:beforeSwap', function(event) {
+            if (event.detail.xhr.responseURL.includes('/login')) {
+                event.detail.shouldSwap = false;
+                console.log('Redirecting to login...');
+                alert(`Credentials expired, please log in again.`);
+                window.location.href = '/login';
+            }
         });
     </script>
     
     <script>
         let eventSource;
         document.getElementById('convertButton').addEventListener('click', () => {
-            if (!eventSource) {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
 
-                fetch('/sse/processimages')
-                    .then(response => {
-                        if (response.url.includes('/login')) {
-                            alert('Your session has expired, please log in again.');
-                            window.location.href = response.url;
-                            return;
-                        }
-                        else {
+            fetch('/sse/processimages')
+                .then(response => {
+                    if (response.url.includes('/login')) {
+                        alert('Your session has expired, please log in again.');
+                        window.location.href = response.url;
+                        return;
+                    }
+                    else {
 
-                        convertButton_animation.classList.remove('hidden');
+                    convertButton_animation.classList.remove('hidden');
 
-                        eventSource = new EventSource('/sse/processimages');
-                        document.getElementById('resultContainer2').innerHTML = '';
-                        const outputDiv = document.getElementById('resultContainer2');
+                    eventSource = new EventSource('/sse/processimages');
+                    document.getElementById('resultContainer2').innerHTML = '';
+                    const outputDiv = document.getElementById('resultContainer2');
 
-                        eventSource.onmessage = (event) => {
-                            console.log(event)
-                            const data = JSON.parse(event.data);
-                            if (data.event === "close") {
-                                console.log("Received close event. Closing connection.");
-                                convertButton_animation.classList.add('hidden');
-                                eventSource.close();
-                            } else {
-                                console.log(data.message)
-                                outputDiv.innerText = data.message;
-                            };
-                        }
-
-                        eventSource.onerror = (error) => {
-                            console.log(error.status)
-                            console.error('EventSource failed:', error);
+                    eventSource.onmessage = (event) => {
+                        console.log(event)
+                        const data = JSON.parse(event.data);
+                        if (data.event === "close") {
+                            console.log("Received close event. Closing connection.");
                             convertButton_animation.classList.add('hidden');
                             eventSource.close();
+                        } else {
+                            console.log(data.message)
+                            outputDiv.innerText = data.message;
                         };
-
                     }
-                });
-            }
-        })
-    </script>
 
-    <script>
-        function uploadFile() {
-            document.getElementById('responseContainer').innerHTML = '';
-            
-            var form = document.getElementById('uploadForm');
-            var formData = new FormData(form);
+                    eventSource.onerror = (error) => {
+                        console.log(error.status)
+                        console.error('EventSource failed:', error);
+                        convertButton_animation.classList.add('hidden');
+                        eventSource.close();
+                    };
 
-            fetch('/uploadfolder', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.url.includes('/login')) {
-                    alert('Your session has expired, please log in again.');
-                    window.location.href = response.url;
-                    return;
                 }
-                return response.json();
-            })
-            .then(data => {
-                document.getElementById('responseContainer').innerHTML = data.message;
-            })
-            .catch(error => {
-                console.error('There was a problem with the fetch operation:', error);
             });
-        }
+        });
     </script>
     
     <script>
@@ -267,15 +249,12 @@
                     return;
                 }
                 const blob = await response.blob();
-
-                // Create a link element and trigger the download
                 const a = document.createElement('a');
                 const url = window.URL.createObjectURL(blob);
                 a.href = url;
                 a.download = 'saved_data.csv';
                 document.body.appendChild(a);
                 a.click();
-
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
             }

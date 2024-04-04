@@ -1,6 +1,6 @@
 from fastapi import HTTPException, Depends, status, APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from typing import Optional, Union
 from sqlmodel import Session, select, delete
 from app.schemas import Token, TokenData, User, UserInDB, UserCreate, UserOut
@@ -58,4 +58,4 @@ def register_user(user: UserCreate, session: Session = Depends(get_session)):
         
 @router.get("/register")
 async def register():
-    return {'message':'Sorry, registration is disabled at the moment, please contact administrator to get registered.'}
+    return HTMLResponse(content='Sorry, registration is disabled at the moment, please contact administrator to get registered.')
